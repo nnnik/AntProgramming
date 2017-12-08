@@ -14,12 +14,38 @@ class testController {
 		}
 		onWallCollide() {
 			this.stop()
-			Random, deg, 15, 90
+			Random, deg, 15, 45
 			this.turnLBy( deg )
 		}
 		onHungry() {
 			this.stopEverything()
 			this.turnToHill()
+		}
+		onArriveHome() {
+			this.stopEverything()
+			this.turnRBy( 180 )
+		}
+		onSeeAnt( anyAnt ) {
+			if ( this.getEnergy() > 33.33 && this.getEnergy() < 90 && !isObject( this.getProperty( "follows" ) ) && !anyAnt.getProperty( "follows" ).equals( this ) )
+			{
+				this.turnTo( anyAnt )
+				this.setProperty( "follows", anyAnt )
+			}
+		}
+		onSeeAntHill( anyAntHill )
+		{
+			
+			if ( this.getEnergy() > 33.33 && this.getEnergy() < 90 && ( !isObject( this.getProperty( "follows" ) ) || !this.getProperty( "follows" ).ptr ) )
+			{
+				this.stopTurn()
+				this.turnRBy( 45 )
+			}
+		}
+		onTick(){
+			if ( this.getEnergy() > 33.33 && isObject( this.getProperty( "follows" ) ) )
+			{
+				this.turnTo( this.getProperty( "follows" ) )
+			}
 		}
 		onBored() {
 			;Random, val, 1, 6
@@ -54,6 +80,7 @@ class GameControl {
 	w := 600
 	h := 600
 	elements := []
+	elementsClass := {}
 	movingElements := []
 	
 	__New()
@@ -152,11 +179,15 @@ class GraphicalElement {
 		this.setRot( rot )
 		this.pic.setVisible()
 		GameControl.elements[ &this ] := this
+		GameControl.elementsClass[ this.__Class, &this ] := this
+		this.onSpawn()
 	}
 	
 	despawn() {
+		this.onDespawn()
 		GameControl.elements.delete( &this )
 		GameControl.movingElements.delete( &this )
+		GameControl.elementsClass[ this.__Class ].delete( &this )
 		This.pic.setVisible( false )
 		This.pic := ""
 	}
@@ -185,8 +216,9 @@ class GraphicalElement {
 
 
 class Ant extends GraphicalElement {
-	static picFile := "res\ant.png", picLevel := 3, picSize := [ 0.0125, 0.03 ], collisionSize := 0.03
+	static picFile := "res\ant.png", picLevel := 3, picSize := new Vector2d( 0.0125, 0.03 ), collisionSize := 0.03
 	
+	static viewDist := 0.1
 	static maxVel := 0.1
 	static maxRot := 1
 	static energyRot  := 1
@@ -197,7 +229,15 @@ class Ant extends GraphicalElement {
 	propertyValues := []
 	propertyKeys   := []
 	energy := 100
+	sees   := []
 	
+	onSpawn() {
+		This.sees[ &this ] := 1
+	}
+	
+	onDespawn() {
+		this.antHill.ants--
+	}
 	
 	executeLogic() {
 		;check for turn
@@ -209,21 +249,10 @@ class Ant extends GraphicalElement {
 				This.setRot( This.targetDegrees )
 				This.getControl().stopTurn()
 			}
-			else if ( isObject( This.targetDegrees ) )
+			else if ( isObject( This.targetDegrees ) && abs( This.rot - ( nRot := This.targetDegrees.pos.sub( This.pos ).getRot() ) ) < maxRot )
 			{
-				tDist := This.targetDegrees.pos.sub( This.pos )
-				dDist := tDist.div( tDist.magnitude() )
-				if ( dDist.1 < 0 )
-					nRot := 8*atan( 1 ) -acos( dDist.2 )
-				else
-					nRot := acos( dDist.2 )
-				if ( abs( This.rot - nRot ) < maxRot )
-				{
-					This.setRot( nRot )
-					This.getControl().stopTurn()
-				}
-				else
-					This.setRot( This.rot + ( ( This.state & 4 ) ? -maxRot : maxRot ) )
+				This.setRot( nRot )
+				This.getControl().stopTurn()
 			}
 			else
 				This.setRot( This.rot + ( ( This.state & 4 ) ? -maxRot : maxRot ) )
@@ -237,15 +266,37 @@ class Ant extends GraphicalElement {
 				This.triggerCallBack( "Idle" )
 		}
 		This.energy -= This.energyIdle * GameControl.dT
+		saw := this.sees.clone()
+		newSee := []
+		for each, className in [ "Ant", "AntHill" ] {
+			for each, element in GameControl.elementsClass[ className ]
+			{
+				if ( ( inView := element.pos.sub( this.pos ).magnitude() < ( This.viewDist + element.picSize.magnitude() ) / 2 ) && !saw.hasKey( &element ) ) {
+					this.sees[ &element ] := 1
+					newSee.push( element )
+				}
+				else if inView
+					saw.delete( &element )
+			}
+		}
+		for each, void in saw
+			This.sees.delete( each )
+		for each, element in newSee {
+			This.triggerCallBack( "See" . element.__Class, element.getInfo() )
+		}
 		if ( GameControl.frameTime - This.timeLastStateChange > 5 )
 			This.triggerCallBack( "Bored" )
-		;Tooltip % This.energy
-		if ( This.pos.sub( This.antHill.pos ).abs().div( ( new Vector2d( This.antHill.picSize* ) ).div( 2 ) ).magnitude() < 1 )
+		if ( This.pos.sub( This.antHill.pos ).abs().div( ( This.antHill.picSize ).div( 2 ) ).magnitude() < 1 )
+		{
+			if ( e < 100 )
+				This.triggerCallBack( "ArriveHome" )
 			This.energy := 100
+		}
 		if ( This.energy < 33.333 && e > 33.333 )
 			This.triggerCallBack( "Hungry" )
 		if ( This.energy < 0 )
 			This.despawn()
+		This.triggerCallBack( "Tick" )
 	}
 	
 	addState( bitMask ) {
@@ -259,29 +310,67 @@ class Ant extends GraphicalElement {
 	}
 	
 	triggerCallBack( name, p* ) {
-		This.antHill.controller.antControl["on" . name ].call( This.getControl() )
+		This.antHill.controller.antControl["on" . name ].call( This.getControl(), p* )
 	}
 	
 	getControl() {
 		return new This.AntMoveControl( This )
 	}
 	
+	getInfo() {
+		return new This.AntInfo( This )
+	}
+	
+	class AntInfo {
+		
+		__New( nAnt ) {
+			This.ptr := &nAnt
+		}
+		
+		getEnergy() {
+			return resolveRef( This ).energy
+		}
+		
+		getTurning() {
+			nAnt := resolveRef( This )
+			if ( nAnt.state & 2 )
+				return nAnt.state & 4 ? "R" : "L"
+		}
+		
+		getWalk() {
+			return resolveRef( This ) & 1
+		}
+		
+		getProperty( name ) {
+			nAnt := resolveRef( This )
+			for each, propertyName in nAnt.propertyKeys
+				if ( propertyName = name )
+					return nAnt.propertyValues[ each ]
+		}
+		
+		equals( objOrRef ) {
+			if ( objOrRef.hasKey( "ptr" ) )
+				return objOrRef.ptr = this.ptr
+		}
+		
+	}
+	
 	class AntMoveControl {
 		
 		__New( nAnt ) {
-			This.ant := &nAnt
+			This.ptr := &nAnt
 		}
 		
 		walk() {
-			Object( This.ant ).addState( 1 )
+			resolveRef( This ).addState( 1 )
 		}
 		
 		stop() {
-			Object( This.ant ).removeState( 1 )
+			resolveRef( This ).removeState( 1 )
 		}
 		
 		turnL() {
-			nAnt := Object( This.ant )
+			nAnt := resolveRef( This )
 			nAnt.addState( 2 )
 			nAnt.removeState( 4 )
 			nAnt.targetDegrees := ""
@@ -289,60 +378,94 @@ class Ant extends GraphicalElement {
 		
 		turnLBy( degrees ) {
 			degrees := deg2rad( degrees )
-			nAnt := Object( This.ant )
-			nAnt.addState( 2 )
-			nAnt.removeState( 4 )
+			nAnt := resolveRef( This )
+			This.turnL()
 			nAnt.targetDegrees := trueMod( nAnt.rot + degrees, atan( 1 ) * 8 )
 		}
 		
 		turnR() {
-			nAnt := Object( This.ant )
+			nAnt := resolveRef( This )
 			nAnt.addState( 6 )
 			nAnt.targetDegrees := ""
 		}
 		
 		turnRBy( degrees ) {
 			degrees := deg2rad( degrees )
-			nAnt := Object( This.ant )
-			nAnt.addState( 2 )
-			nAnt.removeState( 4 )
+			nAnt := resolveRef( This )
+			This.turnR()
 			nAnt.targetDegrees := trueMod( nAnt.rot - degrees , atan( 1 ) * 8 )
 		}
 		
-		turnToHill() {
-			nAnt  := Object( This.ant )
-			dHill := nAnt.antHill.pos.sub( nAnt.pos ).rotate( -this.rot )
-			if ( dHill.2 < 0 )
-				This.turnR()
-			else
+		turnTo( reference ) {
+			if !isObject( reference )
+				Throw Exception( "Cannot turn to that" )
+			if reference.hasKey( "ptr" ) {
+				reference := resolveRef( reference )
+			}
+			nAnt  := resolveRef( This )
+			nRot := reference.pos.sub( nAnt.pos ).getRot()
+			if ( nRot - This.rot < 0 )
 				This.turnL()
-			nAnt.targetDegrees := nAnt.antHill
+			else
+				This.turnR()
+			nAnt.targetDegrees := reference
+		}
+		
+		turnToHill() {
+			This.turnTo( resolveRef( This ).antHill )
 		}
 		
 		stopTurn() {
-			nAnt := Object( This.ant ).removeState( 6 )
+			nAnt := resolveRef( This )
+			nAnt.removeState( 6 )
 			nAnt.targetDegrees := ""
 		}
 		
+		getTurn() {
+			nAnt := resolveRef( This )
+			if ( nAnt.state & 2 )
+				return nAnt.state & 4 ? "R" : "L"
+		}
+		
 		stopEverything() {
-			Object( This.ant ).removeState( 0xFF )
+			resolveRef( This ).removeState( 0xFF )
 		}
 		
 		setProperty( name, value ) {
-			nAnt := Object( This.ant )
+			nAnt := resolveRef( This )
 			for each, propertyName in nAnt.propertyKeys
-				if ( popertyName = name )
+				if ( propertyName = name )
+				{
 					return nAnt.propertyValues[ each ] := value
-			propertyValues.Push( value )
-			propertyKeys.Push( name )
+				}
+			nAnt.propertyValues.Push( value )
+			nAnt.propertyKeys.Push( name )
 			return value
 		}
 		
 		getProperty( name ) {
-			nAnt := Object( This.ant )
+			nAnt := resolveRef( This )
+			
 			for each, propertyName in nAnt.propertyKeys
-				if ( popertyName = name )
+				if ( propertyName = name )
+				{
+					;Msgbox getProperty success
 					return nAnt.propertyValues[ each ]
+				}
+			
+		}
+		
+		getEnergy() {
+			return resolveRef( This ).energy
+		}
+		
+		getWalk() {
+			return resolveRef( This ) & 1
+		}
+		
+		equals( objOrRef ) {
+			if ( objOrRef.hasKey( "ptr" ) )
+				return objOrRef.ptr = this.ptr
 		}
 		
 	}
@@ -350,22 +473,28 @@ class Ant extends GraphicalElement {
 }
 
 class AntHill extends GraphicalElement {
-	static picFile := "res\anthill.png", picLevel := 2, picSize := [ 0.1, 0.1 ]
+	static picFile := "res\anthill.png", picLevel := 2, picSize := new Vector2d( 0.1, 0.1 )
 	
+	
+	static spawnRate := 1
+	static maxAnts   := 30
 	timeSinceLastSpawn := getTime() - 10
+	ants := 0
 	
 	setController( controller ) {
 		This.controller := controller
 	}
 	
 	executeLogic() {
-		if ( GameControl.frameTime - this.timeSinceLastSpawn > 10 )
+		if ( GameControl.frameTime - this.timeSinceLastSpawn > This.spawnRate && This.ants < This.maxAnts )
 		{
 			Random, deg, 0, 359
 			deg := deg / 45 * atan(1)
 			sinVal := sin( deg ) * ( ( this.picSize.2 + Ant.picSize.2 ) / 2 ), cosVal := cos( deg ) * ( ( this.picSize.1  + Ant.picSize.2 ) / 2 )
 			newAnt := new Ant( [ this.pos.1 + sinVal, this.pos.2 + cosVal ], deg )
 			newAnt.antHill := This
+			newAnt.sees[ &This ] := 1
+			This.ants++
 			this.timeSinceLastSpawn := GameControl.frameTime
 		}
 	}
@@ -373,15 +502,15 @@ class AntHill extends GraphicalElement {
 }
 
 class Sugar extends GraphicalElement {
-	static picFile := "res\sugarfull.png", picLevel := 2, picSize := [ 0.05, 0.05 ]
+	static picFile := "res\sugarfull.png", picLevel := 2, picSize := new Vector2d( 0.05, 0.05 )
 }
 
 class Apple extends GraphicalElement {
-	static picFile := "res\apple.png", picLevel := 2, picSize := [ 0.05, 0.05 ]
+	static picFile := "res\apple.png", picLevel := 2, picSize := new Vector2d( 0.05, 0.05 )
 }
 
 class BackGround extends GraphicalElement {
-	static picFile := "res\background.png", picLevel := 1, picSize := [ 1.1, 1.1 ]
+	static picFile := "res\background.png", picLevel := 1, picSize := new Vector2d( 1.1, 1.1 )
 }
 
 getTime() {
@@ -405,6 +534,14 @@ trueMod( a, b ) {
 	a := a/b
 	a := a - floor( a )
 	return a * b
+}
+
+resolveRef( refElement ) {
+	if GameControl.elements.hasKey( refElement.ptr ) {
+		return Object( refElement.ptr )
+	}
+	refElement.delete( "ptr" )
+	refElement.base := ""
 }
 
 class vector2d
@@ -463,6 +600,13 @@ class vector2d
 	
 	rotate( degrees ) {
 		return new Vector2d( this.1 * cos( degrees ) + this.2 * sin( degrees ), this.2 * cos( degrees ) - this.1 * sin( degrees ) )
+	}
+	
+	getRot() {
+		if ( This.1 < 0 )
+			return 8*atan( 1 ) -acos( This.2 / This.magnitude() )
+		else
+			return acos( This.2 / This.magnitude() )
 	}
 	
 }
