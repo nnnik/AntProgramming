@@ -13,14 +13,27 @@ class testController {
 			this.walk()
 		}
 		onWallCollide() {
-			this.turnL()
+			this.stop()
+			Random, deg, 15, 90
+			this.turnLBy( deg )
+		}
+		onHungry() {
+			this.stopEverything()
+			this.turnToHill()
 		}
 		onBored() {
-			this.stopTurn()
+			;Random, val, 1, 6
+			;if ( val = 5 )
+			;{
+				;this.stop()
+				;this.turnToHill()
+			;}
+			;else
+				;this.stop()
 		}
 	}
 }
-
+;-----This Controller normally should get added by a seperate script through COM
 
 
 class AntServer {
@@ -85,8 +98,7 @@ class GameControl {
 	tick() {
 		this.setFrameTime()
 		this.doEntityTasks()
-		this.calculateMovement()
-		this.calculateCollisions()
+		this.calculatePhysics()
 		this.callEventHandlers()
 		this.draw()
 	}
@@ -98,6 +110,8 @@ class GameControl {
 	setFrameTime() {
 		currentTime := getTime()
 		this.dT := currentTime - this.frameTime
+		if !this.dT
+			this.dT := 0
 		this.frameTime := currentTime
 	}
 	
@@ -106,15 +120,12 @@ class GameControl {
 			element.executeLogic()
 	}
 	
-	calculateMovement() {
-		for each, movingElement in this.movingElements {
-			movingElement.setPos( movingElement.pos.add( movingElement.vel.mul( this.dT ) ) )
-		}
-	}
-	
-	calculateCollisions() {
+	calculatePhysics() {
 		for each, movingElement in this.movingElements {
 			if ( movingElement.collisionSize ) {
+				if ( movingElement.vel.1 = 0 && movingElement.vel.2 = 0 )
+					continue
+				movingElement.setPos( movingElement.pos.add( movingElement.vel.mul( this.dT ) ) )
 				pos := movingElement.pos
 				vec := new Vector2d( 1, 1 )
 				dist := vec.sub( pos ).abs()
@@ -146,6 +157,8 @@ class GraphicalElement {
 	despawn() {
 		GameControl.elements.delete( &this )
 		GameControl.movingElements.delete( &this )
+		This.pic.setVisible( false )
+		This.pic := ""
 	}
 	
 	setPos( pos ) {
@@ -157,8 +170,9 @@ class GraphicalElement {
 	}
 	
 	setRot( rot ) {
-		this.rot := rot
-		this.pic.setRotation( [ -rot * 45 / atan( 1 ), 0, 0 ] )
+		static pi4 := atan( 1 )
+		this.rot := trueMod( rot, pi4 * 8 )
+		this.pic.setRotation( [ -rot * 45 / pi4, 0, 0 ] )
 	}
 	
 	setVelocity( vel ) {
@@ -173,25 +187,65 @@ class GraphicalElement {
 class Ant extends GraphicalElement {
 	static picFile := "res\ant.png", picLevel := 3, picSize := [ 0.0125, 0.03 ], collisionSize := 0.03
 	
+	static maxVel := 0.1
+	static maxRot := 1
+	static energyRot  := 1
+	static energyWalk := 1
+	static energyIdle := 1
 	state := 0 ;a bitmask
 	timeLastStateChange := getTime()
-	maxVel := 0.1
-	maxRot := 0.05
 	propertyValues := []
 	propertyKeys   := []
+	energy := 100
 	
 	
 	executeLogic() {
 		;check for turn
+		e := This.energy
 		if ( This.state & 2 ) {
-			This.setRot( This.rot + ( ( This.state & 4 ) ? -This.maxRot : This.maxRot ) )
+			maxRot := This.maxRot * GameControl.dT
+			This.energy -= This.energyRot * GameControl.dT
+			if ( This.targetDegrees > -1 && abs( This.rot - This.targetDegrees ) < maxRot ) {
+				This.setRot( This.targetDegrees )
+				This.getControl().stopTurn()
+			}
+			else if ( isObject( This.targetDegrees ) )
+			{
+				tDist := This.targetDegrees.pos.sub( This.pos )
+				dDist := tDist.div( tDist.magnitude() )
+				if ( dDist.1 < 0 )
+					nRot := 8*atan( 1 ) -acos( dDist.2 )
+				else
+					nRot := acos( dDist.2 )
+				if ( abs( This.rot - nRot ) < maxRot )
+				{
+					This.setRot( nRot )
+					This.getControl().stopTurn()
+				}
+				else
+					This.setRot( This.rot + ( ( This.state & 4 ) ? -maxRot : maxRot ) )
+			}
+			else
+				This.setRot( This.rot + ( ( This.state & 4 ) ? -maxRot : maxRot ) )
 		}
-		if ( This.state & 1 )
+		if ( This.state & 1 ) {
+			This.energy -= This.energyWalk * GameControl.dT
 			This.setVelocity( [ sin( This.rot ) * This.maxVel, cos( This.rot ) * This.maxVel ] )
-		else if ( !This.state )
-			This.triggerCallBack( "Idle" )
+		} else {
+			This.setVelocity( [ 0, 0 ] )
+			if ( !This.state )
+				This.triggerCallBack( "Idle" )
+		}
+		This.energy -= This.energyIdle * GameControl.dT
 		if ( GameControl.frameTime - This.timeLastStateChange > 5 )
 			This.triggerCallBack( "Bored" )
+		;Tooltip % This.energy
+		if ( This.pos.sub( This.antHill.pos ).abs().div( ( new Vector2d( This.antHill.picSize* ) ).div( 2 ) ).magnitude() < 1 )
+			This.energy := 100
+		if ( This.energy < 33.333 && e > 33.333 )
+			This.triggerCallBack( "Hungry" )
+		if ( This.energy < 0 )
+			This.despawn()
 	}
 	
 	addState( bitMask ) {
@@ -230,14 +284,44 @@ class Ant extends GraphicalElement {
 			nAnt := Object( This.ant )
 			nAnt.addState( 2 )
 			nAnt.removeState( 4 )
+			nAnt.targetDegrees := ""
+		}
+		
+		turnLBy( degrees ) {
+			degrees := deg2rad( degrees )
+			nAnt := Object( This.ant )
+			nAnt.addState( 2 )
+			nAnt.removeState( 4 )
+			nAnt.targetDegrees := trueMod( nAnt.rot + degrees, atan( 1 ) * 8 )
 		}
 		
 		turnR() {
-			Object( This.ant ).addState( 6 )
+			nAnt := Object( This.ant )
+			nAnt.addState( 6 )
+			nAnt.targetDegrees := ""
+		}
+		
+		turnRBy( degrees ) {
+			degrees := deg2rad( degrees )
+			nAnt := Object( This.ant )
+			nAnt.addState( 2 )
+			nAnt.removeState( 4 )
+			nAnt.targetDegrees := trueMod( nAnt.rot - degrees , atan( 1 ) * 8 )
+		}
+		
+		turnToHill() {
+			nAnt  := Object( This.ant )
+			dHill := nAnt.antHill.pos.sub( nAnt.pos ).rotate( -this.rot )
+			if ( dHill.2 < 0 )
+				This.turnR()
+			else
+				This.turnL()
+			nAnt.targetDegrees := nAnt.antHill
 		}
 		
 		stopTurn() {
-			Object( This.ant ).removeState( 6 )
+			nAnt := Object( This.ant ).removeState( 6 )
+			nAnt.targetDegrees := ""
 		}
 		
 		stopEverything() {
@@ -282,9 +366,6 @@ class AntHill extends GraphicalElement {
 			sinVal := sin( deg ) * ( ( this.picSize.2 + Ant.picSize.2 ) / 2 ), cosVal := cos( deg ) * ( ( this.picSize.1  + Ant.picSize.2 ) / 2 )
 			newAnt := new Ant( [ this.pos.1 + sinVal, this.pos.2 + cosVal ], deg )
 			newAnt.antHill := This
-			;newAntC := newAnt.getControl()
-			;newAntC.walk()
-			;newAntC.turnL()
 			this.timeSinceLastSpawn := GameControl.frameTime
 		}
 	}
@@ -307,6 +388,23 @@ getTime() {
 	static frequency, init := DllCall( "QueryPerformanceFrequency", "UInt64*", frequency )
 	DllCall( "QueryPerformanceCounter", "UInt64*", time )
 	return time / frequency
+}
+
+deg2rad( deg ) {
+	static deg2rad := atan( 1 ) / 45
+	return deg * deg2rad
+}
+
+rad2deg( rad ) {
+	static rad2deg := 45 / atan( 1 )
+	return rad * rad2deg
+}
+
+trueMod( a, b ) {
+	a := a < 0 ? a + ( b * ceil( -a/b ) ) : a
+	a := a/b
+	a := a - floor( a )
+	return a * b
 }
 
 class vector2d
@@ -357,6 +455,14 @@ class vector2d
 	lequal( vector )
 	{
 		return ( this.1 <= vector.1 ) && ( this.2 <= vector.2 )
+	}
+	
+	dotP( vector ) {
+		return this.1 * vector.1 + this.2 * vector.2
+	}
+	
+	rotate( degrees ) {
+		return new Vector2d( this.1 * cos( degrees ) + this.2 * sin( degrees ), this.2 * cos( degrees ) - this.1 * sin( degrees ) )
 	}
 	
 }
