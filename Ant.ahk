@@ -6,8 +6,6 @@ SetBatchLines, -1
 AntServer.addAntHill( testController )
 AntServer.startUp()
 
-
-
 class testController {
 	
 	class antControl {
@@ -80,9 +78,12 @@ class GameControl {
 	elements := []
 	elementsClass := {}
 	movingElements := []
+	timeMultiplier := 1
+	calcRounds     := 1
 	
 	__New()
 	{
+		global SpeedSlider
 		static init := new GameControl()
 		if init
 			return init
@@ -90,14 +91,13 @@ class GameControl {
 		%className% := This	
 		
 		GUI, NEW
-		GUI +hwndGUI
-		
+		GUi, add, Picture,  % "w" . this.w . " h" . this.h . " hwndGUI"
+		GUI, add, Slider, % "w" . this.w " vSpeedSlider gSpeedChange", 33
 		This.hwnd    := GUI
 		This.display := new display( GUI, [ 1, 1 ] )
-		GUI, show, % "w" . this.w . " h" this.h
+		GUI, show,
 		fn := this.initializeGame.bind( this )
 		SetTimer, %fn%, -1
-		
 	}
 	
 	initializeGame() {
@@ -106,10 +106,17 @@ class GameControl {
 	
 	startGameLoop()
 	{
+		This.tickTime := getTime()
+		This.frameTime := getTime()
 		SetTimer, gameLoop, 15
 		return
 		gameLoop:
 		GameControl.tick()
+		return
+		SpeedChange:
+		GuiControlGet, SpeedSlider, , SpeedSlider
+		GameControl.timeMultiplier := SpeedSlider < 33 ? 1 / ( 33-SpeedSlider ) : ( SpeedSlider - 22 ) / 10
+		GameControl.calcRounds := Round( GameControl.timeMultiplier ) ? Round( GameControl.timeMultiplier ) : 1
 		return
 		GuiClose:
 		ExitApp
@@ -121,19 +128,32 @@ class GameControl {
 	}
 	
 	tick() {
-		this.setFrameTime()
-		this.doEntityTasks()
-		this.calculatePhysics()
-		this.generateLevel()
+		this.setTickTime()
+		Loop % This.calcRounds {
+			this.addFrameTime()
+			this.calculateWorld()
+		}
+		
 		this.draw()
 	}
 	
-	setFrameTime() {
+	calculateWorld() {
+		this.doEntityTasks()
+		this.calculatePhysics()
+		this.generateLevel()
+	}
+	
+	setTickTime() {
 		currentTime := getTime()
-		this.dT := currentTime - this.frameTime
+		This.deltaTick := currentTime - This.tickTime
+		This.tickTime := currentTime
+	}
+	
+	addFrameTime() {
+		this.dT := This.deltaTick * This.timeMultiplier / This.calcRounds
 		if !this.dT
 			this.dT := 0
-		this.frameTime := currentTime
+		this.frameTime += this.dT
 	}
 	
 	doEntityTasks() {
@@ -164,22 +184,21 @@ class GameControl {
 	}
 	
 	generateLevel() {
-		static sugar
-		if !sugar {
-			Random, dice, 1, 100
-			if ( dice = 1 )
-			{
-				sugar := []
-				sugar.1 := This.spawnSugar()
-			}
+		static sugar := [], spawnSpeed, spawnValues, maxHeaps := 4
+		if !spawnSpeed {
+			spawnSpeed := 4
+			spawnValues := []
+			Loop % maxHeaps
+				spawnValues.push( 0 )
 		}
-		Random, dice, 1, 2000
-		if ( dice < 3 )
-		{
-			sugar[ dice ].despawn()
-			sugar[ dice ] := This.spawnSugar()
+		Random, dice, 1, 10
+		Random, sugarDice, 1, 4
+		if ( spawnValues[ sugarDice ] += dice * GameControl.dT * spawnSpeed * maxHeaps ) > 100 {
+			spawnValues[ sugarDice ] := 0
+			sugar[ sugarDice ].despawn()
+			sugar[ sugarDice ] := This.spawnSugar()
+			spawnSpeed := 0.2
 		}
-		
 	}
 	
 	spawnSugar() {
@@ -283,7 +302,8 @@ class Ant extends GraphicalElement {
 	static viewDist := 0.1
 	static maxVel := 0.1
 	static maxVelHolding := 0.025
-	static maxRot := 1
+	static maxRot := 4
+	static maxRotHolding := 1
 	static energyRot     := 1
 	static energyWalk    := 1
 	static energyIdle    := 1
@@ -311,7 +331,7 @@ class Ant extends GraphicalElement {
 	executeLogic() {
 		;check for turn
 		if ( This.state & 2 ) {
-			maxRot := This.maxRot * GameControl.dT
+			maxRot := ( This.holding ? This.maxRotHolding : This.maxRot ) * GameControl.dT
 			if ( ( This.targetDegrees > -1 && abs( This.rot - ( nRot := This.targetDegrees ) ) < maxRot ) || ( isObject( This.targetDegrees ) && abs( This.rot - ( nRot := This.targetDegrees.pos.sub( This.pos ).getRot() ) ) < maxRot ) ) {
 				This.setRot( nRot )
 				This.getControl().stopTurn()
@@ -474,6 +494,11 @@ class Ant extends GraphicalElement {
 				return nAnt.holding.getInfo()
 		}
 		
+		isHome() {
+			nAnt := resolveRef( This )
+			return nAnt.touches.hasKey( nAnt.antHill )
+		}
+		
 	}
 	
 	class AntMoveControl extends Ant.AntInfo {
@@ -565,7 +590,8 @@ class Ant extends GraphicalElement {
 			nAnt := resolveRef( This )
 			if !held := nAnt.holding
 				return "Ant can't drop nothing"
-			nAnt.holding.droppedBy( nAnt )
+			held.setVelocity( [0, 0] )
+			held.droppedBy( nAnt )
 			nAnt.holding := ""
 			if nAnt.touches.hasKey( &(nAnt.antHill) )
 				nAnt.antHill.notifyDrop( held )
@@ -631,7 +657,7 @@ class SugarHeap extends GraphicalElement {
 	static canPickup := 1
 	
 	onSpawn() {
-		Random, durability, 3, 5
+		Random, durability, 10, 50
 		This.pieces := durability
 	}
 	
@@ -645,7 +671,7 @@ class SugarHeap extends GraphicalElement {
 }
 
 class SugarPiece extends GraphicalElement {
-	static picFile := "res\sugarfull.png", picLevel := 4, picSize := new Vector2d( 0.015, 0.015 )
+	static picFile := "res\sugarfull.png", picLevel := 4, picSize := new Vector2d( 0.015, 0.015 ), collisionSize := 0.015
 	static canPickup := 1
 	static isFood := 1
 	heldBy := []
