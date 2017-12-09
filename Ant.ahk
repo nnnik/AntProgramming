@@ -7,6 +7,7 @@ AntServer.addAntHill( testController )
 AntServer.startUp()
 
 
+
 class testController {
 	
 	class antControl {
@@ -22,15 +23,37 @@ class testController {
 			this.stopEverything()
 			this.turnToHill()
 		}
-		onArriveHome() {
+		onArriveHome( home ) {
+			This.drop()
+			This.stop()
+			This.turnRBy( 180 )
 		}
-		onSeeAnt( anyAnt ) {
+		onSeeSugarHeap( anySugarHeap ) {
+			if ( This.getEnergy() > 33.333 && !This.getHolding() ) {
+				This.stop()
+				This.turnTo( anySugarHeap )
+			}
 		}
-		onSeeAntHill( anyAntHill ) {
+		onArriveSugarHeap( anySugarHeap ) {
+			if ( This.getEnergy() > 33.333 && !This.getHolding() ) {
+				This.stop()
+				This.turnToHill()
+				This.pickUp( anySugarHeap )
+			}
 		}
-		onTick(){
+		onSeeSugarPiece( anySugarPiece ) {
+			if ( This.getEnergy() > 33.333 && !anySugarPiece.getHeldBy() && !This.getHolding() ){
+				This.stop()
+				This.turnTo( anySugarPiece )
+			}
 		}
-		onBored() {
+		onArriveSugarPiece( anySugarPiece ) {
+			if ( This.getEnergy() > 33.333 && !This.getHolding() && !anySugarPiece.getHeldBy() ){
+				This.pickUp( anySugarPiece )
+				This.stop()
+				This.turnToHill()
+			}
+			
 		}
 	}
 }
@@ -141,18 +164,37 @@ class GameControl {
 	}
 	
 	generateLevel() {
-		static sugar := []
+		static sugar
+		if !sugar {
+			Random, dice, 1, 100
+			if ( dice = 1 )
+			{
+				sugar := []
+				sugar.1 := This.spawnSugar()
+			}
+		}
 		Random, dice, 1, 2000
 		if ( dice < 3 )
 		{
 			sugar[ dice ].despawn()
+			sugar[ dice ] := This.spawnSugar()
+		}
+		
+	}
+	
+	spawnSugar() {
+		Loop {
 			random, x, 1, 2000
 			random, y, 1, 2000
 			x := x / 2000 + 0.5
 			y := y / 2000 + 0.5
-			sugar[ dice ] := new SugarHeap( [x, y] )
-		}
-		
+			posSugar := new Vector2d( x, y )
+			min := 100000
+			For each, nAntHill in This.elementsClass.AntHill
+				if ( ( dist := posSugar.sub( nAntHill.pos ).magnitude() ) < min )
+					min := dist
+		} Until min > 0.333
+		return new SugarHeap( posSugar )
 	}
 	
 	draw() {
@@ -162,6 +204,8 @@ class GameControl {
 }
 
 class GraphicalElement {
+	
+	static isElem := 1
 	
 	__New( pos, rot := 0 ) {
 		this.pic := GameControl.display.addPicture( this.picFile, [ 1, 1, this.picLevel ], this.picSize )
@@ -206,7 +250,13 @@ class GraphicalElement {
 		GameControl.movingElements[ &this ] := this
 	}
 	
-	class ElementProxy {
+	getInfo() {
+		return new GraphicalElement.ElementInfo( This )
+	}
+	
+	class ElementInfo {
+		
+		static isRef := 1
 		
 		__New( Obj ) {
 			This.ptr := &Obj
@@ -218,13 +268,9 @@ class GraphicalElement {
 			return &objOrRef == This.ptr
 		}
 		
-	} 
-	
-	class ElementInfo extends GraphicalElement.ElementProxy {
-		
-	}
-	
-	class ElementControl extends GraphicalElement.ElementProxy {
+		getType() {
+			return resolveRef( This ).__Class
+		}
 		
 	}
 	
@@ -236,25 +282,30 @@ class Ant extends GraphicalElement {
 	
 	static viewDist := 0.1
 	static maxVel := 0.1
+	static maxVelHolding := 0.025
 	static maxRot := 1
-	static energyRot  := 1
-	static energyWalk := 1
-	static energyIdle := 1
+	static energyRot     := 1
+	static energyWalk    := 1
+	static energyIdle    := 1
+	static energyHolding := 1
 	state := 0 ;a bitmask
 	timeLastStateChange := getTime()
 	propertyValues := []
 	propertyKeys   := []
 	energy := 100
 	sees   := []
+	touches:= []
 	visited:= true
 	hungry := false
 	
 	onSpawn() {
 		This.sees[ &this ] := 1
+		This.touches[ &this ] := 1
 	}
 	
 	onDespawn() {
 		this.antHill.ants--
+		this.holding.droppedBy( This )
 	}
 	
 	executeLogic() {
@@ -272,7 +323,8 @@ class Ant extends GraphicalElement {
 		}
 		if ( This.state & 1 ) {
 			This.energy -= This.energyWalk * GameControl.dT
-			This.setVelocity( [ sin( This.rot ) * This.maxVel, cos( This.rot ) * This.maxVel ] )
+			vel := This.holding ? This.maxVelHolding : This.maxVel
+			This.setVelocity( [ sin( This.rot ) * vel, cos( This.rot ) * vel ] )
 		} else {
 			This.setVelocity( [ 0, 0 ] )
 			if ( !This.state )
@@ -280,29 +332,51 @@ class Ant extends GraphicalElement {
 		}
 		This.energy -= This.energyIdle * GameControl.dT
 		saw := this.sees.clone()
+		touched := this.touches.clone()
 		newSee := []
-		for each, className in [ "Ant", "AntHill", "SugarHeap" ] {
+		newTouch := []
+		for each, className in [ "Ant", "AntHill", "SugarHeap", "SugarPiece" ] {
 			for each, element in GameControl.elementsClass[ className ]
 			{
-				if ( ( inView := element.pos.sub( this.pos ).magnitude() < ( This.viewDist + element.picSize.magnitude() ) / 2 ) && !saw.hasKey( &element ) ) {
-					this.sees[ &element ] := 1
-					newSee.push( element )
+				inview := false
+				if ( ( dist := element.pos.sub( this.pos ) ).magnitude()  < ( This.viewDist + element.picSize.magnitude() ) / 2 ) {
+					if ( !saw.hasKey( &element ) ) {
+						this.sees[ &element ] := 1
+						newSee.push( element )
+					} else 
+						saw.delete( &element )
+					if ( dist.div( element.picSize.div( 2 ) ).magnitude() <= 1 ) {
+						if (  !touched.hasKey( &element ) ) {
+							this.touches[ &element ] := 1
+							newTouch.push( element )
+						}
+						else
+							touched.delete( &element )
+					}
 				}
-				else if inView
-					saw.delete( &element )
 			}
 		}
-		for each, void in saw
-			This.sees.delete( each )
-		for each, element in newSee {
-			This.triggerCallBack( "See" . element.__Class, element.getInfo() )
+		for elementPtr, void in saw
+			This.sees.delete( elementPtr )
+		for elementPtr, void in touched
+			This.touches.delete( elementPtr )
+		for each, element in newSee{
+			This.triggerCallBack( "See" . This.getName( element ), element.getInfo() )
+		}
+		for each, element in newTouch {
+			This.triggerCallBack( "Arrive" . This.getName( element ), element.getInfo() )
+		}
+		if ( This.holding ) {
+			This.holding.setPos( This.pos.add( [ This.picSize.2 / 2 * sin( This.rot ), This.picSize.2 / 2 * cos( This.rot ) ] ) )
+			This.holding.setVelocity( This.vel )
+			This.holding.setRot( This.rot )
+			This.energy -= This.energyHolding * GameControl.dT
 		}
 		if ( GameControl.frameTime - This.timeLastStateChange > 5 )
 			This.triggerCallBack( "Bored" )
-		if ( This.pos.sub( This.antHill.pos ).abs().div( ( This.antHill.picSize ).div( 2 ) ).magnitude() < 1 )
+		if ( This.touches.hasKey( &( This.antHill ) ) )
 		{
 			if ( !This.visited ) {
-				This.triggerCallBack( "ArriveHome" )
 				This.hungry := false
 				This.visited := true
 			}
@@ -318,6 +392,18 @@ class Ant extends GraphicalElement {
 		if ( This.energy < 0 )
 			This.despawn()
 		This.triggerCallBack( "Tick" )
+	}
+	
+	getName( element ) {
+		if ( element == this.antHill )
+			return "Home"
+		if ( element.__Class == "Ant" ) {
+			if ( element.antHill == This.antHill )
+				return "AlliedAnt"
+			else
+				return "ForeignAnt"
+		}
+		return element.__Class
 	}
 	
 	addState( bitMask ) {
@@ -366,9 +452,31 @@ class Ant extends GraphicalElement {
 					return nAnt.propertyValues[ each ]
 		}
 		
+		getVisible() {
+			vis := []
+			for elementPtr, void in This.sees
+				if ( elementPtr != &This && elem := resolvePtr( elementPtr ).getInfo() ).isRef
+					vis.Push( elem )
+			return vis
+		}
+		
+		getTouched() {
+			touch := []
+			for elementPtr, void in This.touches
+				if ( elementPtr != &This && elem := resolvePtr( elementPtr ).getInfo() ).isRef
+					touch.Push( elem )
+			return touch
+		}
+		
+		getHolding() {
+			nAnt := resolveRef( This )
+			if nAnt.holding
+				return nAnt.holding.getInfo()
+		}
+		
 	}
 	
-	class AntMoveControl extends GraphicalElement.ElementControl {
+	class AntMoveControl extends Ant.AntInfo {
 		
 		
 		walk() {
@@ -407,20 +515,18 @@ class Ant extends GraphicalElement {
 		}
 		
 		turnTo( reference ) {
-			if !isObject( reference )
-				Throw Exception( "Cannot turn to that" )
-			if reference.hasKey( "ptr" ) {
+			if reference.isRef
 				reference := resolveRef( reference )
-				if !reference
-					return
-			}
+			if ( !reference.isElem )
+				return "invalid input"
 			nAnt  := resolveRef( This )
+			if !( nAnt.sees.hasKey( &reference ) || nAnt.antHill == reference )
+				return "Ant can't see input and input is not home"
 			nRot := reference.pos.sub( nAnt.pos ).getRot()
 			if ( trueMod( nAnt.rot - nRot, 8*atan( 1 ) ) > 4 * atan( 1 ) )
 				This.turnL()
 			else
 				This.turnR()
-			
 			nAnt.targetDegrees := reference
 		}
 		
@@ -434,18 +540,35 @@ class Ant extends GraphicalElement {
 			nAnt.targetDegrees := ""
 		}
 		
-		getTurn() {
-			nAnt := resolveRef( This )
-			if ( nAnt.state & 2 )
-				return nAnt.state & 4 ? "R" : "L"
-		}
-		
 		stopEverything() {
 			resolveRef( This ).removeState( 0xFF )
+			This.drop()
 		}
 		
-		pickup( element ) {
-			
+		pickup( reference ) {
+			if reference.isRef
+				reference := resolveRef( reference )
+			if ( !reference.isElem )
+				return "invlid Input"
+			if ( !reference.canPickup )
+				return "can't pickup input"
+			nAnt := resolveRef( This )
+			if !( nAnt.touches.hasKey( &reference ) )
+				return "Ant can't pickup anything it doesn't touch"
+			nAnt := resolveRef( This )
+			nAnt.holding := reference.pickedUpBy( nAnt )
+			nAnt.toches[ &( nAnt.holding ) ] := 1
+			nAnt.sees[ &( nAnt.holding ) ] := 1
+		}
+		
+		drop() {
+			nAnt := resolveRef( This )
+			if !held := nAnt.holding
+				return "Ant can't drop nothing"
+			nAnt.holding.droppedBy( nAnt )
+			nAnt.holding := ""
+			if nAnt.touches.hasKey( &(nAnt.antHill) )
+				nAnt.antHill.notifyDrop( held )
 		}
 		
 		setProperty( name, value ) {
@@ -458,22 +581,6 @@ class Ant extends GraphicalElement {
 			return value
 		}
 		
-		getProperty( name ) {
-			nAnt := resolveRef( This )
-			for each, propertyName in nAnt.propertyKeys
-				if ( propertyName = name )
-					return nAnt.propertyValues[ each ]
-			
-		}
-		
-		getEnergy() {
-			return resolveRef( This ).energy
-		}
-		
-		getWalk() {
-			return resolveRef( This ) & 1
-		}
-		
 	}
 	
 }
@@ -482,7 +589,8 @@ class AntHill extends GraphicalElement {
 	static picFile := "res\anthill.png", picLevel := 2, picSize := new Vector2d( 0.1, 0.1 )
 	
 	static spawnRate := 1
-	static maxAnts   := 5
+	static maxAnts   := 30
+	currentAnts := 5
 	timeSinceLastSpawn := getTime() - 10
 	ants := 0
 	
@@ -490,8 +598,16 @@ class AntHill extends GraphicalElement {
 		This.controller := controller
 	}
 	
+	notifyDrop( obj ) {
+		if ( obj.isFood ) {
+			obj.despawn()
+			if ( This.currentAnts < This.maxAnts )
+				This.currentAnts++
+		}
+	}
+	
 	executeLogic() {
-		if ( GameControl.frameTime - this.timeSinceLastSpawn > This.spawnRate && This.ants < This.maxAnts )
+		if ( GameControl.frameTime - this.timeSinceLastSpawn > This.spawnRate && This.ants < This.currentAnts )
 		{
 			Random, deg, 0, 359
 			deg := deg / 45 * atan(1)
@@ -501,6 +617,7 @@ class AntHill extends GraphicalElement {
 			if this.lastAnt
 				newAnt.getControl().setProperty( "follows", this.lastAnt )
 			newAnt.sees[ &This ] := 1
+			newAnt.touches[ &This ] := 1
 			this.lastAnt := newAnt
 			This.ants++
 			this.timeSinceLastSpawn := GameControl.frameTime
@@ -513,22 +630,51 @@ class SugarHeap extends GraphicalElement {
 	static picFile := "res\sugarfull.png", picLevel := 2, picSize := new Vector2d( 0.05, 0.05 )
 	static canPickup := 1
 	
-	pickUp() {
-		return new This.sugarPiece( [ 1, 1 ] )
+	onSpawn() {
+		Random, durability, 3, 5
+		This.pieces := durability
 	}
 	
-	class SugarPiece extends GraphicalElement {
-		static picFile := "res\sugarfull.png", picLevel := 2, picSize := new Vector2d( 0.01, 0.01 )
-		static canPickup := 1
-		pickup() {
-			return This
+	pickedUpBy( elem ) {
+		piece := new SugarPiece( This.pos.clone() )
+		if !( --This.pieces )
+			This.despawn()
+		return piece.pickedUpBy( elem )
+	}
+	
+}
+
+class SugarPiece extends GraphicalElement {
+	static picFile := "res\sugarfull.png", picLevel := 4, picSize := new Vector2d( 0.015, 0.015 )
+	static canPickup := 1
+	static isFood := 1
+	heldBy := []
+	
+	pickedUpBy( elem ) {
+		This.heldBy[ &elem ] := 1
+		return This
+	}
+	
+	droppedBy( elem ) {
+		This.heldBy.delete( &elem )
+		return This
+	}
+	
+	getInfo() {
+		return new This.SugarPieceInfo( This )
+	}
+	
+	class SugarPieceInfo extends GraphicalElement.ElementInfo {
+		getHeldBy() {
+			nSugar := resolveRef( This )
+			heldBy := []
+			for elemPtr, void in nSugar.heldBy
+				if ( ref := resolvePtr( elemPtr ).getInfo() ).isRef {
+					heldBy.push( ref )
+				}
+			if heldBy.Length()
+				return heldBy
 		}
-	}
-	
-	class SugarHeapInfo extends GraphicalElement.ElementInfo {
-		
-		
-		
 	}
 	
 }
@@ -565,11 +711,15 @@ trueMod( a, b ) {
 }
 
 resolveRef( refElement ) {
-	if ( refElement.ptr && GameControl.elements.hasKey( refElement.ptr ) ) {
-		return Object( refElement.ptr )
-	}
+	if ( refElement.isRef && obj := resolvePtr( refElement.ptr ) )
+		return obj
 	refElement.delete( "ptr" )
 	refElement.base := ""
+}
+
+resolvePtr( refPtr ) {
+	if ( GameControl.elements.hasKey( refPtr ) )
+		return Object( refPtr )
 }
 
 class vector2d
