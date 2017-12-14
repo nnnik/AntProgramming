@@ -1,72 +1,21 @@
 ﻿#Include displayOut.ahk
+#Include ObjRegisterActive.ahk
 #NoEnv
+#Persistent
 SetBatchLines, -1
-
-;--------- Testing ---------
-AntServer.addAntHill( testController )
-AntServer.startUp()
-
-class testController {
-	
-	class antControl {
-		onIdle() {
-			this.walk()
-		}
-		onWallCollide() {
-			this.stop()
-			Random, deg, 15, 45
-			this.turnLBy( deg )
-		}
-		onHungry() {
-			this.stopEverything()
-			this.turnToHill()
-		}
-		onArriveHome( home ) {
-			This.drop()
-			This.stop()
-			This.turnRBy( 180 )
-		}
-		onSeeSugarHeap( anySugarHeap ) {
-			if ( This.getEnergy() > 33.333 && !This.getHolding() ) {
-				This.stop()
-				This.turnTo( anySugarHeap )
-			}
-		}
-		onArriveSugarHeap( anySugarHeap ) {
-			if ( This.getEnergy() > 33.333 && !This.getHolding() ) {
-				This.stop()
-				This.turnToHill()
-				This.pickUp( anySugarHeap )
-			}
-		}
-		onSeeSugarPiece( anySugarPiece ) {
-			if ( This.getEnergy() > 33.333 && !anySugarPiece.getHeldBy() && !This.getHolding() ){
-				This.stop()
-				This.turnTo( anySugarPiece )
-			}
-		}
-		onArriveSugarPiece( anySugarPiece ) {
-			if ( This.getEnergy() > 33.333 && !This.getHolding() && !anySugarPiece.getHeldBy() ){
-				This.pickUp( anySugarPiece )
-				This.stop()
-				This.turnToHill()
-			}
-			
-		}
-	}
-}
-;-----This Controller normally should get added by a seperate script through COM
+ObjRegisterActive( AntServer, "{f52e0360-3454-4576-8486-8131f0b92f6c}" ) 
+Run, AntHill1.ahk, , , pid
+OnExit, Exit
+return
+Exit:
+Process, Close, %pid%
+ExitApp
 
 
 class AntServer {
 	
-	addAntHill( controller ) {
-		nAntHill := new AntHill( [ 1, 1 ] )
-		nAntHill.setController( controller )
-	}
-	
-	startup() {
-		GameControl.startGameLoop()
+	addController( controller, Name ) {
+		GameControl.addController( controller, Name )
 	}
 	
 }
@@ -75,48 +24,98 @@ class GameControl {
 	
 	w := 600
 	h := 600
-	elements := []
-	elementsClass := {}
+	elements       := []
+	elementsClass  := {}
 	movingElements := []
 	timeMultiplier := 1
 	calcRounds     := 1
+	controller     := []
+	started        := false
+	state          := ""
 	
 	__New()
 	{
-		global SpeedSlider
+		global SpeedSlider, ControllerDDL
 		static init := new GameControl()
 		if init
 			return init
 		className := This.base.__Class
 		%className% := This	
 		
-		GUI, NEW
 		GUi, add, Picture,  % "w" . this.w . " h" . this.h . " hwndGUI"
-		GUI, add, Slider, % "w" . this.w " vSpeedSlider gSpeedChange", 33
+		GUI, add, Slider, % "w" . this.w . " vSpeedSlider gSpeedChange", 33
+		GUI, add, DropDownList, % "w" . this.w " vControllerDDL gControllerChange"
 		This.hwnd    := GUI
 		This.display := new display( GUI, [ 1, 1 ] )
-		GUI, show,
-		fn := this.initializeGame.bind( this )
-		SetTimer, %fn%, -1
+		GUI, show
+		This.draw()
+		return
+		SpeedChange:
+		GuiControlGet, SpeedSlider, , SpeedSlider
+		GameControl.timeMultiplier := SpeedSlider < 33 ? 1 / ( 43-SpeedSlider ) * 10 : ( SpeedSlider - 22 ) / 10
+		GameControl.calcRounds := Round( GameControl.timeMultiplier ) ? Round( GameControl.timeMultiplier ) : 1
+		return
+		ControllerChange:
+		GuiControlGet, ControllerDDL, , ControllerDDL
+		if GameControl.started
+			GameControl.shutdown( func( "startNewSimulation" ).bind( ControllerDDL ) )
+		else
+			startNewSimulation( ControllerDDL, GameControl )
+		return
 	}
 	
-	initializeGame() {
-		new BackGround( [ 1, 1 ] )
+	addController( controller, Name ) {
+		global ControllerDDL
+		if !This.controller.hasKey( Name )
+			GuiControl, , ControllerDDL, % Name
+		This.controller[ Name ] := controller
+	}
+	
+	shutdown( callBack := "" ) {
+		if !This.running
+		{
+			This.execShutDown()
+			return
+		}
+		This.toShutDown := 1
+		This.shutDownCallBack := callBack
+	}
+	
+	execShutDown() {
+		This.toShutDown := 0
+		This.started := false
+		This.stopGameLoop()
+		for each, element in This.elements.clone() {
+			element.despawn()
+		}
+		This.backGround     := ""
+		This.elements       := ""
+		This.elementsClass  := ""
+		This.movingElements := ""
+		This.Spawner.shutDown()
+		This.draw()
+		This.shutDownCallBack()
+		This.shutDownCallBack := ""
+	}
+	
+	startUp() {
+		This.elements       := []
+		This.elementsClass  := {}
+		This.movingElements := {}
+		This.backGround     := new BackGround( [ 1, 1 ] )
+		This.Spawner.startUp()
+		This.started := true
 	}
 	
 	startGameLoop()
 	{
 		This.tickTime := getTime()
 		This.frameTime := getTime()
+		This.running := true
 		SetTimer, gameLoop, 15
 		return
 		gameLoop:
 		GameControl.tick()
-		return
-		SpeedChange:
-		GuiControlGet, SpeedSlider, , SpeedSlider
-		GameControl.timeMultiplier := SpeedSlider < 33 ? 1 / ( 33-SpeedSlider ) : ( SpeedSlider - 22 ) / 10
-		GameControl.calcRounds := Round( GameControl.timeMultiplier ) ? Round( GameControl.timeMultiplier ) : 1
 		return
 		GuiClose:
 		ExitApp
@@ -124,23 +123,34 @@ class GameControl {
 	
 	stopGameLoop()
 	{
+		This.running := false
 		SetTimer, gameLoop, off
 	}
 	
 	tick() {
+		if This.tickRunning
+			return
+		This.tickrunning := 1
+		This.state := "Tick started"
 		this.setTickTime()
+		This.state := "Tick set Time"
 		Loop % This.calcRounds {
 			this.addFrameTime()
+			This.state := "Tick add frame Time"
 			this.calculateWorld()
+			This.state := "Tick calculate world"
 		}
-		
 		this.draw()
+		Tick.state := "draw"
+		if ( this.toShutdown )
+			This.execShutdown()
+		This.tickRunning := 0
 	}
 	
 	calculateWorld() {
 		this.doEntityTasks()
 		this.calculatePhysics()
-		this.generateLevel()
+		this.Spawner.spawnStuff()
 	}
 	
 	setTickTime() {
@@ -150,19 +160,19 @@ class GameControl {
 	}
 	
 	addFrameTime() {
-		this.dT := This.deltaTick * This.timeMultiplier / This.calcRounds
-		if !this.dT
-			this.dT := 0
-		this.frameTime += this.dT
+		This.dT := This.deltaTick * This.timeMultiplier / This.calcRounds
+		if !This.dT
+			This.dT := 0
+		This.frameTime += This.dT
 	}
 	
 	doEntityTasks() {
-		for each,  element in this.elements
+		for each,  element in This.elements
 			element.executeLogic()
 	}
 	
 	calculatePhysics() {
-		for each, movingElement in this.movingElements {
+		for each, movingElement in This.movingElements {
 			if ( movingElement.collisionSize ) {
 				if ( movingElement.vel.1 = 0 && movingElement.vel.2 = 0 )
 					continue
@@ -183,37 +193,49 @@ class GameControl {
 		}
 	}
 	
-	generateLevel() {
-		static sugar := [], spawnSpeed, spawnValues, maxHeaps := 4
-		if !spawnSpeed {
-			spawnSpeed := 4
-			spawnValues := []
-			Loop % maxHeaps
-				spawnValues.push( 0 )
+	class Spawner {
+		
+		static sugar, spawnSpeed, spawnValues, maxHeaps := 4
+		
+		startUp() {
+			This.sugar := []
+			This.spawnSpeed := 4
+			This.spawnValues := []
+			Loop % This.maxHeaps
+				This.spawnValues.push( 0 )
 		}
-		Random, dice, 1, 10
-		Random, sugarDice, 1, 4
-		if ( spawnValues[ sugarDice ] += dice * GameControl.dT * spawnSpeed * maxHeaps ) > 100 {
-			spawnValues[ sugarDice ] := 0
-			sugar[ sugarDice ].despawn()
-			sugar[ sugarDice ] := This.spawnSugar()
-			spawnSpeed := 0.2
+		
+		shutDown() {
+			This.sugar := ""
+			This.spawnValues := ""
 		}
-	}
-	
-	spawnSugar() {
-		Loop {
-			random, x, 1, 2000
-			random, y, 1, 2000
-			x := x / 2000 + 0.5
-			y := y / 2000 + 0.5
-			posSugar := new Vector2d( x, y )
-			min := 100000
-			For each, nAntHill in This.elementsClass.AntHill
-				if ( ( dist := posSugar.sub( nAntHill.pos ).magnitude() ) < min )
-					min := dist
-		} Until min > 0.333
-		return new SugarHeap( posSugar )
+		
+		spawnStuff() {
+			Random, dice, 1, 10
+			Random, sugarDice, 1, 4
+			if ( This.spawnValues[ sugarDice ] += dice * GameControl.dT * This.spawnSpeed * This.maxHeaps ) > 100 {
+				This.spawnValues[ sugarDice ] := 0
+				This.sugar[ sugarDice ].despawn()
+				This.sugar[ sugarDice ] := This.spawnSugar()
+				This.spawnSpeed := 0.2
+			}
+		}
+		
+		spawnSugar() {
+			Loop {
+				random, x, 1, 2000
+				random, y, 1, 2000
+				x := x / 2000 + 0.5
+				y := y / 2000 + 0.5
+				posSugar := new Vector2d( x, y )
+				min := 100000
+				For each, nAntHill in GameControl.elementsClass.AntHill
+					if ( ( dist := posSugar.sub( nAntHill.pos ).magnitude() ) < min )
+						min := dist
+			} Until min > 0.333
+			return new SugarHeap( posSugar )
+		}
+		
 	}
 	
 	draw() {
@@ -227,13 +249,13 @@ class GraphicalElement {
 	static isElem := 1
 	
 	__New( pos, rot := 0 ) {
-		this.pic := GameControl.display.addPicture( this.picFile, [ 1, 1, this.picLevel ], this.picSize )
-		this.setPos( pos )
-		this.setRot( rot )
-		this.pic.setVisible()
-		GameControl.elements[ &this ] := this
+		This.pic := GameControl.display.addPicture( This.picFile, [ 1, 1, This.picLevel ], This.picSize )
+		This.setPos( pos )
+		This.setRot( rot )
+		This.pic.setVisible()
+		GameControl.elements[ &This ] := This
 		GameControl.elementsClass[ this.__Class, &this ] := this
-		this.onSpawn()
+		This.onSpawn()
 	}
 	
 	__Delete() {
@@ -241,12 +263,18 @@ class GraphicalElement {
 	}
 	
 	despawn() {
-		this.onDespawn()
+		if This.despawned
+			return
+		This.despawned := true
+		This.onDespawn()
 		GameControl.elements.delete( &this )
-		GameControl.movingElements.delete( &this )
+		if ( GameControl.movingElements.hasKey( &This ) ) {
+			GameControl.movingElements.delete( &This )
+		}
 		GameControl.elementsClass[ this.__Class ].delete( &this )
 		This.pic.setVisible( false )
 		This.pic := ""
+		This.base := ""
 	}
 	
 	setPos( pos ) {
@@ -266,7 +294,8 @@ class GraphicalElement {
 	setVelocity( vel ) {
 		this.vel := vel
 		this.vel.base := Vector2d
-		GameControl.movingElements[ &this ] := this
+		if !GameControl.movingElements.hasKey( &this )
+			GameControl.movingElements[ &this ] := this
 	}
 	
 	getInfo() {
@@ -315,6 +344,7 @@ class Ant extends GraphicalElement {
 	energy := 100
 	sees   := []
 	touches:= []
+	messages := []
 	visited:= true
 	hungry := false
 	
@@ -324,12 +354,15 @@ class Ant extends GraphicalElement {
 	}
 	
 	onDespawn() {
-		this.antHill.ants--
-		this.holding.droppedBy( This )
+		This.antHill.ants--
+		This.holding.droppedBy( This )
+		This.holding := ""
+		This.antHill := ""
 	}
 	
 	executeLogic() {
 		;check for turn
+		This.handleMessages()
 		if ( This.state & 2 ) {
 			maxRot := ( This.holding ? This.maxRotHolding : This.maxRot ) * GameControl.dT
 			if ( ( This.targetDegrees > -1 && abs( This.rot - ( nRot := This.targetDegrees ) ) < maxRot ) || ( isObject( This.targetDegrees ) && abs( This.rot - ( nRot := This.targetDegrees.pos.sub( This.pos ).getRot() ) ) < maxRot ) ) {
@@ -438,7 +471,9 @@ class Ant extends GraphicalElement {
 	
 	triggerCallBack( name, p* ) {
 		if This.hasKey( "antHill" )
-			This.antHill.controller.antControl["on" . name ].call( This.getControl(), p* )
+			try This.antHill.controller.antControl["on" . name ].call( This.getControl(), p* )
+		catch e
+			This.antHill.notifyDeadController()
 	}
 	
 	getControl() {
@@ -447,6 +482,25 @@ class Ant extends GraphicalElement {
 	
 	getInfo() {
 		return new This.AntInfo( This )
+	}
+	
+	drop() {
+		held := This.holding
+		held.setVelocity( [0, 0] )
+		held.droppedBy( This )
+		This.holding := ""
+		if This.touches.hasKey( &(This.antHill) )
+			This.antHill.notifyDrop( held )
+	}
+	
+	addMessage( Name, p* ) {
+		This.messages.push( [Name, p] )
+	}
+	
+	handleMessages() {
+		for each, message in This.messages
+			This[ message.1 ].Call( This, ( message.2 )* )
+		This.messages := []
 	}
 	
 	class AntInfo extends GraphicalElement.ElementInfo {
@@ -590,11 +644,7 @@ class Ant extends GraphicalElement {
 			nAnt := resolveRef( This )
 			if !held := nAnt.holding
 				return "Ant can't drop nothing"
-			held.setVelocity( [0, 0] )
-			held.droppedBy( nAnt )
-			nAnt.holding := ""
-			if nAnt.touches.hasKey( &(nAnt.antHill) )
-				nAnt.antHill.notifyDrop( held )
+			nAnt.addMessage( "drop" )
 		}
 		
 		setProperty( name, value ) {
@@ -615,13 +665,20 @@ class AntHill extends GraphicalElement {
 	static picFile := "res\anthill.png", picLevel := 2, picSize := new Vector2d( 0.1, 0.1 )
 	
 	static spawnRate := 1
-	static maxAnts   := 30
-	currentAnts := 5
+	static maxAnts   := 20
+	currentAnts := 1
 	timeSinceLastSpawn := getTime() - 10
 	ants := 0
 	
 	setController( controller ) {
 		This.controller := controller
+	}
+	
+	notifyDeadController() {
+		Try This.controller.ping()
+		catch e {
+			GameControl.shutDown()
+		}
 	}
 	
 	notifyDrop( obj ) {
@@ -640,11 +697,8 @@ class AntHill extends GraphicalElement {
 			sinVal := sin( deg ) * ( ( this.picSize.2 + Ant.picSize.2 ) / 2 ), cosVal := cos( deg ) * ( ( this.picSize.1  + Ant.picSize.2 ) / 2 )
 			newAnt := new Ant( [ this.pos.1 + sinVal, this.pos.2 + cosVal ], deg )
 			newAnt.antHill := This
-			if this.lastAnt
-				newAnt.getControl().setProperty( "follows", this.lastAnt )
 			newAnt.sees[ &This ] := 1
 			newAnt.touches[ &This ] := 1
-			this.lastAnt := newAnt
 			This.ants++
 			this.timeSinceLastSpawn := GameControl.frameTime
 		}
@@ -657,7 +711,7 @@ class SugarHeap extends GraphicalElement {
 	static canPickup := 1
 	
 	onSpawn() {
-		Random, durability, 10, 50
+		Random, durability, 3, 5
 		This.pieces := durability
 	}
 	
@@ -742,10 +796,16 @@ resolveRef( refElement ) {
 	refElement.delete( "ptr" )
 	refElement.base := ""
 }
-
 resolvePtr( refPtr ) {
 	if ( GameControl.elements.hasKey( refPtr ) )
 		return Object( refPtr )
+}
+startNewSimulation( controllerName, nGameControl )
+{
+	nGameControl.startUp()
+	nAntHill := new AntHill( [ 1, 1 ] )
+	nAntHill.setController( nGameControl.controller[ controllerName ] )
+	nGameControl.startGameLoop()
 }
 
 class vector2d

@@ -49,5 +49,8 @@ Temporary Items
 # Tests for testdriven development
 tdd*.*
 
+# In case of an accidential compile
+*.exe
+
 # for AHKStudio
 AHK-Studio Backup/

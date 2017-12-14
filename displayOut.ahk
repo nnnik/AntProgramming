@@ -642,6 +642,7 @@ class gdipAPI extends displayBackendAPI
 	
 	createBuffers()
 	{
+		This.redraw      := 1
 		This.zBuffers    := {}
 		This.frameBuffer := new This.ZBuffer()
 		This.frameBuffer.setDrawStyle( "Pixel" )
