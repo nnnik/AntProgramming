@@ -124,7 +124,8 @@ class display
 	
 	setDrawStyle( drawStyle )
 	{
-		This.drawStyle := drawStyle,This.getAPI().notifyDrawStyle()
+		This.drawStyle := drawStyle
+		This.getAPI().notifyDrawStyle()
 	}
 	
 	setPixelPerField( pix )
@@ -187,7 +188,7 @@ class display
 	{
 		if  ( !( size.1 > 0 && size.2 > 0 ) )
 			return 1
-		else if !( This.size.1 = size.1 && This.size.2 = This.size.2 )
+		else if !( This.size.1 = size.1 && This.size.2 = size.2 )
 			This.size := size
 		This.getAPI().notifyField()
 	}
@@ -688,7 +689,7 @@ class gdipAPI extends displayBackendAPI
 	{
 		This.drawStyle := drawStyle
 		For each, zBuffer in This.zBuffers
-			zBuffer.setDrawStyle( size )
+			zBuffer.setDrawStyle( drawStyle )
 	}
 	
 	getBufferDrawStyle( drawStyle )
@@ -723,7 +724,7 @@ class gdipAPI extends displayBackendAPI
 	{
 		pos     := pic.getPosition()
 		size    := pic.getSize()
-		return [ Round( ( pos.1 - size.1 / 2  ) * This.mul.1 + This.add.1 ), Round( ( pos.2 - size.2 / 2  ) * This.mul.2 + This.add.2 ), Round( size.1 * This.mul.1 ), Round( size.2 * This.mul.2 ) ]
+		return [  ( pos.1 - size.1 / 2  ) * This.mul.1 + This.add.1, ( pos.2 - size.2 / 2  ) * This.mul.2 + This.add.2, size.1 * This.mul.1 , size.2 * This.mul.2 ]
 	}
 	
 	prepareFrame()

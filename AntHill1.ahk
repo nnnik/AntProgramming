@@ -13,19 +13,20 @@ class testController2 {
 		return 1
 	}
 	
-	
 	class antControl {
 		onIdle() {
 			this.walk()
 		}
 		onWallCollide() {
-			this.stop()
-			Random, deg, 15, 45
-			Random, dir, 0, 1
-			if ( dir )
-				this.turnLBy( deg )
-			else
-				This.turnRBy( deg )
+			if !this.getHolding() {
+				this.stop()
+				Random, deg, 45, 90
+				Random, dir, 0, 1
+				if ( dir )
+					this.turnLBy( deg )
+				else
+					This.turnRBy( deg )
+			}
 		}
 		onHungry() {
 			this.stopEverything()
@@ -58,10 +59,19 @@ class testController2 {
 		onArriveSugarPiece( anySugarPiece ) {
 			if ( This.getEnergy() > 33.333 && !This.getHolding() && !anySugarPiece.getHeldBy() ){
 				This.pickUp( anySugarPiece )
-				This.stop()
-				This.turnToHill()
+				if !This.isHome() {
+					This.stop()
+					This.turnToHill()
+				}
+				else
+					This.drop()
 			}
 			
+		}
+		onSeeAlliedAnt( anyAnt ) {
+			if !( This.getHolding() || This.getEnergy() < 33.333 || anyAnt.getHolding() || This.canSee( "SugarHeap" ) || This.canSee( "SugarPiece" )  || This.canSee( "Home" ) ) {
+				This.turnLBy( 135 )
+			}
 		}
 	}
 	

@@ -1,0 +1,482 @@
+
+{
+	backGround: 
+	{
+		pic: 
+		{
+			fileName: "res\background.png", 
+			parentDisplay: [], 
+			pos: [1.500000, 1.500000, 1], 
+			rot: [0.000000, 0, 0], 
+			size: [2.200000, 2.200000], 
+			visible: 1, 
+			zLayer: 
+			{
+				layerID: 1, 
+				parentDisplay: [], 
+				visiblePictures: 
+				{
+					36950728: []
+				}
+			}
+		}, 
+		pos: [1.500000, 1.500000], 
+		rot: 0.000000
+	}, 
+	calcRounds: 1, 
+	controller: 
+	{
+		Left Rotate Ants: Error(For, 0x80020003 - Mitglied nicht gefunden.), 
+		Random Rotate Ants: Error(For, 0x80020003 - Mitglied nicht gefunden.)
+	}, 
+	display: 
+	{
+		API: 
+		{
+			add: [-150.000000, -150.000000], 
+			api: [], 
+			bufferSize: [600, 600], 
+			display: [], 
+			drawStyle: "", 
+			fieldSize: [2, 2], 
+			frameBuffer: 
+			{
+				bitmap: 
+				{
+					pGraphics: 
+					{
+						ptr: 1909768
+					}, 
+					ptr: 1908488
+				}, 
+				drawStyle: "Pixel", 
+				hChanged: 1, 
+				size: [600, 600]
+			}, 
+			loadedPics: 
+			{
+				res\anthill.png: 
+				{
+					ptr: 72679512
+				}, 
+				res\background.png: 
+				{
+					ptr: 1959256
+				}
+			}, 
+			mul: [300.000000, 300.000000], 
+			notificationQueue: 
+			{
+				updateDrawStyle: func( "gdipAPI.updateDrawStyle" ), 
+				updateField: func( "gdipAPI.updateField" ), 
+				updateTarget: func( "gdipAPI.updateTarget" )
+			}, 
+			redraw: 0, 
+			zBuffers: []
+		}, 
+		size: [2, 2], 
+		targetHWND: 0x220632, 
+		zLayers: [
+		{
+			layerID: 1, 
+			parentDisplay: [], 
+			visiblePictures: 
+			{
+				36950728: []
+			}
+		}, 
+		{
+			layerID: 2, 
+			parentDisplay: [], 
+			visiblePictures: 
+			{
+				36951728: []
+			}
+		}]
+	}, 
+	elements: 
+	{
+		36950928: 
+		{
+			pic: 
+			{
+				fileName: "res\background.png", 
+				parentDisplay: [], 
+				pos: [1.500000, 1.500000, 1], 
+				rot: [0.000000, 0, 0], 
+				size: [2.200000, 2.200000], 
+				visible: 1, 
+				zLayer: 
+				{
+					layerID: 1, 
+					parentDisplay: [], 
+					visiblePictures: 
+					{
+						36950728: []
+					}
+				}
+			}, 
+			pos: [1.500000, 1.500000], 
+			rot: 0.000000
+		}, 
+		36951688: 
+		{
+			ants: 0, 
+			controller: Error(For, 0x80020003 - Mitglied nicht gefunden.), 
+			currentAnts: 5, 
+			pic: 
+			{
+				fileName: "res\anthill.png", 
+				parentDisplay: [], 
+				pos: [1, 1, 2], 
+				rot: [0.000000, 0, 0], 
+				size: [0.1, 0.1], 
+				visible: 1, 
+				zLayer: 
+				{
+					layerID: 2, 
+					parentDisplay: [], 
+					visiblePictures: 
+					{
+						36951728: []
+					}
+				}
+			}, 
+			pos: [1, 1], 
+			rot: 0.000000, 
+			timeSinceLastSpawn: 186210.885326
+		}, 
+		69108840: 
+		{
+			antHill: 
+			{
+				ants: 1, 
+				controller: Error(For, 0x80020003 - Mitglied nicht gefunden.), 
+				currentAnts: 5, 
+				pic: 
+				{
+					fileName: "res\anthill.png", 
+					parentDisplay: [], 
+					pos: [1, 1, 2], 
+					rot: [0.000000, 0, 0], 
+					size: [0.1, 0.1], 
+					visible: 1, 
+					zLayer: 
+					{
+						layerID: 2, 
+						parentDisplay: [], 
+						visiblePictures: 
+						{
+							36951728: []
+						}
+					}
+				}, 
+				pos: [1, 1], 
+				rot: 0.000000, 
+				timeSinceLastSpawn: 186210.885326
+			}, 
+			energy: 100, 
+			hungry: 0, 
+			messages: [], 
+			pic: 
+			{
+				fileName: "res\ant.png", 
+				parentDisplay: [], 
+				pos: [0.947414, 0.961794, 3], 
+				rot: [-234.000000, 0, 0], 
+				size: [0.0125, 0.03], 
+				visible: 1, 
+				zLayer: 
+				{
+					layerID: 3, 
+					parentDisplay: [], 
+					visiblePictures: 
+					{
+						69109800: []
+					}
+				}
+			}, 
+			pos: [0.947414, 0.961794], 
+			propertyKeys: [], 
+			propertyValues: [], 
+			rot: 4.084070, 
+			sees: 
+			{
+				36951688: 1, 
+				69108840: 1
+			}, 
+			state: 0, 
+			timeLastStateChange: 186210.885356, 
+			touches: 
+			{
+				36951688: 1, 
+				69108840: 1
+			}, 
+			visited: 1
+		}
+	}, 
+	dT: 0.002255, 
+	elements: 
+	{
+		36950928: 
+		{
+			pic: 
+			{
+				fileName: "res\background.png", 
+				parentDisplay: [], 
+				pos: [1.500000, 1.500000, 1], 
+				rot: [0.000000, 0, 0], 
+				size: [2.200000, 2.200000], 
+				visible: 1, 
+				zLayer: 
+				{
+					layerID: 1, 
+					parentDisplay: [], 
+					visiblePictures: 
+					{
+						36950728: []
+					}
+				}
+			}, 
+			pos: [1.500000, 1.500000], 
+			rot: 0.000000
+		}, 
+		36951688: 
+		{
+			ants: 1, 
+			controller: Error(For, 0x80020003 - Mitglied nicht gefunden.), 
+			currentAnts: 5, 
+			pic: 
+			{
+				fileName: "res\anthill.png", 
+				parentDisplay: [], 
+				pos: [1, 1, 2], 
+				rot: [0.000000, 0, 0], 
+				size: [0.1, 0.1], 
+				visible: 1, 
+				zLayer: 
+				{
+					layerID: 2, 
+					parentDisplay: [], 
+					visiblePictures: 
+					{
+						36951728: []
+					}
+				}
+			}, 
+			pos: [1, 1], 
+			rot: 0.000000, 
+			timeSinceLastSpawn: 186210.885326
+		}, 
+		69108840: 
+		{
+			antHill: 
+			{
+				ants: 1, 
+				controller: Error(For, 0x80020003 - Mitglied nicht gefunden.), 
+				currentAnts: 5, 
+				pic: 
+				{
+					fileName: "res\anthill.png", 
+					parentDisplay: [], 
+					pos: [1, 1, 2], 
+					rot: [0.000000, 0, 0], 
+					size: [0.1, 0.1], 
+					visible: 1, 
+					zLayer: 
+					{
+						layerID: 2, 
+						parentDisplay: [], 
+						visiblePictures: 
+						{
+							36951728: []
+						}
+					}
+				}, 
+				pos: [1, 1], 
+				rot: 0.000000, 
+				timeSinceLastSpawn: 186210.885326
+			}, 
+			energy: 100, 
+			hungry: 0, 
+			messages: [], 
+			pic: 
+			{
+				fileName: "res\ant.png", 
+				parentDisplay: [], 
+				pos: [0.947414, 0.961794, 3], 
+				rot: [-234.000000, 0, 0], 
+				size: [0.0125, 0.03], 
+				visible: 1, 
+				zLayer: 
+				{
+					layerID: 3, 
+					parentDisplay: [], 
+					visiblePictures: 
+					{
+						69109800: []
+					}
+				}
+			}, 
+			pos: [0.947414, 0.961794], 
+			propertyKeys: [], 
+			propertyValues: [], 
+			rot: 4.084070, 
+			sees: 
+			{
+				36951688: 1, 
+				69108840: 1
+			}, 
+			state: 0, 
+			timeLastStateChange: 186210.885356, 
+			touches: 
+			{
+				36951688: 1, 
+				69108840: 1
+			}, 
+			visited: 1
+		}
+	}, 
+	elementsClass: 
+	{
+		Ant: 
+		{
+			69108840: 
+			{
+				antHill: 
+				{
+					ants: 1, 
+					controller: Error(For, 0x80020003 - Mitglied nicht gefunden.), 
+					currentAnts: 5, 
+					pic: 
+					{
+						fileName: "res\anthill.png", 
+						parentDisplay: [], 
+						pos: [1, 1, 2], 
+						rot: [0.000000, 0, 0], 
+						size: [0.1, 0.1], 
+						visible: 1, 
+						zLayer: 
+						{
+							layerID: 2, 
+							parentDisplay: [], 
+							visiblePictures: 
+							{
+								36951728: []
+							}
+						}
+					}, 
+					pos: [1, 1], 
+					rot: 0.000000, 
+					timeSinceLastSpawn: 186210.885326
+				}, 
+				energy: 100, 
+				hungry: 0, 
+				messages: [], 
+				pic: 
+				{
+					fileName: "res\ant.png", 
+					parentDisplay: [], 
+					pos: [0.947414, 0.961794, 3], 
+					rot: [-234.000000, 0, 0], 
+					size: [0.0125, 0.03], 
+					visible: 1, 
+					zLayer: 
+					{
+						layerID: 3, 
+						parentDisplay: [], 
+						visiblePictures: 
+						{
+							69109800: []
+						}
+					}
+				}, 
+				pos: [0.947414, 0.961794], 
+				propertyKeys: [], 
+				propertyValues: [], 
+				rot: 4.084070, 
+				sees: 
+				{
+					36951688: 1, 
+					69108840: 1
+				}, 
+				state: 0, 
+				timeLastStateChange: 186210.885356, 
+				touches: 
+				{
+					36951688: 1, 
+					69108840: 1
+				}, 
+				visited: 1
+			}
+		}, 
+		AntHill: 
+		{
+			36951688: 
+			{
+				ants: 1, 
+				controller: Error(For, 0x80020003 - Mitglied nicht gefunden.), 
+				currentAnts: 5, 
+				pic: 
+				{
+					fileName: "res\anthill.png", 
+					parentDisplay: [], 
+					pos: [1, 1, 2], 
+					rot: [0.000000, 0, 0], 
+					size: [0.1, 0.1], 
+					visible: 1, 
+					zLayer: 
+					{
+						layerID: 2, 
+						parentDisplay: [], 
+						visiblePictures: 
+						{
+							36951728: []
+						}
+					}
+				}, 
+				pos: [1, 1], 
+				rot: 0.000000, 
+				timeSinceLastSpawn: 186210.885326
+			}
+		}, 
+		BackGround: 
+		{
+			36950928: 
+			{
+				pic: 
+				{
+					fileName: "res\background.png", 
+					parentDisplay: [], 
+					pos: [1.500000, 1.500000, 1], 
+					rot: [0.000000, 0, 0], 
+					size: [2.200000, 2.200000], 
+					visible: 1, 
+					zLayer: 
+					{
+						layerID: 1, 
+						parentDisplay: [], 
+						visiblePictures: 
+						{
+							36950728: []
+						}
+					}
+				}, 
+				pos: [1.500000, 1.500000], 
+				rot: 0.000000
+			}
+		}
+	}, 
+	fieldSize: [2, 2], 
+	frameTime: 186210.885326, 
+	h: 600, 
+	hwnd: 0x220632, 
+	movingElements: [], 
+	running: 1, 
+	started: 1, 
+	state: "Tick calculate world", 
+	tickrunning: 0, 
+	tickTime: 186210.885324, 
+	timeMultiplier: 1, 
+	w: 600
+}
